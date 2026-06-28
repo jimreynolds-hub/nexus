@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus — SDR Intelligence</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* ── Reset & tokens ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #f5f0e8;
+      --surface:   #faf7f2;
+      --surface2:  #ede7d9;
+      --border:    #d4c9b0;
+      --accent:    #4a7c59;
+      --accent2:   #3a6347;
+      --green:     #3a7d44;
+      --yellow:    #c48a1f;
+      --red:       #c0392b;
+      --text:      #2d2d2d;
+      --muted:     #7a6f5e;
+      --radius:    8px;
+      --font:      'Inter', system-ui, sans-serif;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+    button { cursor: pointer; border: none; background: none; color: inherit; font: inherit; }
+    input, textarea { font: inherit; color: inherit; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; width: 100%; color: var(--text); resize: vertical; }
+    input:focus, textarea:focus { outline: 2px solid var(--accent); }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* ── Layout ── */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+    .topbar { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .topbar-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+    .topbar-logo span { color: var(--accent); }
+    .topbar-sub { color: var(--muted); font-size: 12px; }
+    .topbar-spacer { flex: 1; }
+    .topbar-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--muted); }
+
+    .main { flex: 1; display: flex; }
+
+    /* ── Account List ── */
+    .list-pane { width: 100%; padding: 24px; }
+    .list-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .list-header h1 { font-size: 20px; font-weight: 600; }
+    .list-count { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px; font-size: 12px; color: var(--muted); }
+    .sort-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .sort-bar span { font-size: 12px; color: var(--muted); }
+    .sort-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); font-size: 12px; color: var(--muted); transition: all .15s; }
+    .sort-btn.active { border-color: var(--accent); color: var(--accent); background: #4a7c5918; }
+    .sort-btn:hover:not(.active) { border-color: var(--border); color: var(--text); }
+
+    .account-table { width: 100%; border-collapse: collapse; }
+    .account-table th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--border); }
+    .account-table td { padding: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .account-table tr:last-child td { border-bottom: none; }
+    .account-table tbody tr { transition: background .12s; }
+    .account-table tbody tr:hover { background: var(--surface2); cursor: pointer; }
+    .account-table tbody tr.selected { background: #4a7c5910; }
+
+    .acct-name { font-weight: 600; font-size: 14px; }
+    .acct-industry { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .signal-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .signal-pill.high   { background: #22c55e18; color: var(--green); border: 1px solid #22c55e30; }
+    .signal-pill.medium { background: #eab30818; color: var(--yellow); border: 1px solid #eab30830; }
+    .signal-pill.low    { background: #ef444418; color: var(--red);    border: 1px solid #ef444430; }
+    .signal-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .date-text { font-size: 12px; color: var(--muted); }
+
+    /* ── Score Badge ── */
+    .score-badge { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; font-weight: 700; font-size: 14px; border: 2px solid; }
+    .score-badge.hot  { border-color: var(--green); color: var(--green); background: #22c55e10; }
+    .score-badge.warm { border-color: var(--yellow); color: var(--yellow); background: #eab30810; }
+    .score-badge.cold { border-color: var(--muted);  color: var(--muted);  background: transparent; }
+
+    /* ── Detail Pane ── */
+    .detail-overlay { position: fixed; inset: 0; background: #00000060; z-index: 50; display: flex; justify-content: flex-end; }
+    .detail-pane { width: min(680px, 100vw); height: 100vh; background: var(--surface); border-left: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; animation: slideIn .2s ease; }
+    @keyframes slideIn { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .detail-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 14px; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+    .detail-header-info { flex: 1; }
+    .detail-header-info h2 { font-size: 20px; font-weight: 700; }
+    .detail-meta { display: flex; gap: 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+    .close-btn { padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--border); color: var(--muted); font-size: 18px; line-height: 1; background: var(--surface2); }
+    .close-btn:hover { border-color: var(--text); color: var(--text); }
+
+    .detail-body { padding: 20px 24px; flex: 1; display: flex; flex-direction: column; gap: 24px; }
+
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
+
+    /* Score breakdown */
+    .score-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .score-label { font-size: 13px; flex: 1; }
+    .score-bar-wrap { width: 120px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .score-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .4s ease; }
+    .score-pts { font-size: 12px; color: var(--muted); width: 40px; text-align: right; }
+    .score-total-row { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border); margin-top: 4px; font-weight: 600; }
+
+    /* Signal timeline */
+    .signal-list { display: flex; flex-direction: column; gap: 12px; }
+    .signal-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; gap: 14px; }
+    .signal-card.top { border-color: var(--accent); background: #4a7c5908; }
+    .signal-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); }
+    .signal-content { flex: 1; }
+    .signal-title { font-weight: 600; font-size: 13px; }
+    .signal-detail { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .signal-footer { display: flex; gap: 10px; margin-top: 8px; align-items: center; }
+    .signal-source { font-size: 11px; color: var(--accent); }
+    .signal-date { font-size: 11px; color: var(--muted); }
+    .signal-weight { font-size: 11px; font-weight: 600; color: var(--green); margin-left: auto; }
+    .top-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: var(--accent); color: white; border-radius: 4px; padding: 2px 6px; margin-left: auto; }
+
+    /* Outreach panel */
+    .outreach-section { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .outreach-angle { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .outreach-angle strong { color: var(--accent); }
+    .draft-textarea { min-height: 160px; font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
+    .outreach-actions { display: flex; gap: 10px; }
+    .btn { padding: 8px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; transition: all .15s; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #3d6aff; }
+    .btn-secondary { border: 1px solid var(--border); color: var(--muted); background: var(--surface); }
+    .btn-secondary:hover { border-color: var(--text); color: var(--text); }
+    .send-toast { font-size: 12px; color: var(--green); padding: 8px 0 0; display: flex; align-items: center; gap: 6px; }
+
+    /* Empty / utility */
+    .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 40px; }
+
+    /* ── Nav tabs ── */
+    .nav-tabs { display: flex; gap: 4px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .nav-tab { padding: 10px 16px; font-size: 13px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; transition: all .15s; cursor: pointer; background: none; border-top: none; border-left: none; border-right: none; }
+    .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .nav-tab:hover:not(.active) { color: var(--text); }
+
+    /* ── Add Account Modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: #00000050; z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: min(560px, 95vw); max-height: 90vh; overflow-y: auto; }
+    .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h2 { font-size: 17px; font-weight: 700; }
+    .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    select { font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; width: 100%; }
+    select:focus { outline: 2px solid var(--accent); }
+
+    /* ── Connectors Page ── */
+    .connectors-pane { width: 100%; padding: 24px; }
+    .connectors-pane h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+    .connectors-desc { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+    .connector-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .connector-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .15s; }
+    .connector-card:hover { border-color: var(--accent); }
+    .connector-card.connected { border-color: var(--green); }
+    .connector-top { display: flex; align-items: center; gap: 12px; }
+    .connector-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: var(--surface2); border: 1px solid var(--border); flex-shrink: 0; }
+    .connector-name { font-weight: 700; font-size: 15px; }
+    .connector-category { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .connector-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .connector-status { display: flex; align-items: center; justify-content: space-between; }
+    .status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+    .status-pill.connected { background: #3a7d4415; color: var(--green); border: 1px solid #3a7d4430; }
+    .status-pill.disconnected { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .btn-connect { padding: 6px 14px; border-radius: var(--radius); font-size: 12px; font-weight: 600; border: 1px solid var(--accent); color: var(--accent); background: transparent; transition: all .15s; }
+    .btn-connect:hover { background: var(--accent); color: white; }
+    .btn-disconnect { padding: 6px 14px; border-radius: var(--radius); font-size: 12px; font-weight: 600; border: 1px solid var(--border); color: var(--muted); background: transparent; transition: all .15s; }
+    .btn-disconnect:hover { border-color: var(--red); color: var(--red); }
+    .connector-last-sync { font-size: 11px; color: var(--muted); }
+
+    /* ── Signal type filter bar ── */
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .filter-bar span { font-size: 12px; color: var(--muted); }
+    .filter-btn { padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); font-size: 11px; color: var(--muted); transition: all .15s; display: flex; align-items: center; gap: 4px; }
+    .filter-btn.active { border-color: var(--accent); color: var(--accent); background: #4a7c5918; }
+    .filter-btn:hover:not(.active) { color: var(--text); }
+
+    /* ── Score delta ── */
+    .score-delta { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+    .score-delta.up   { color: var(--green);  background: #3a7d4415; }
+    .score-delta.down { color: var(--red);    background: #c0392b15; }
+    .score-delta.flat { color: var(--muted);  background: var(--surface2); }
+
+    /* ── Notes section ── */
+    .notes-section { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+    .notes-textarea { min-height: 80px; font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+    .notes-saved { font-size: 11px; color: var(--green); }
+
+    /* ── Add Signal button in detail ── */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-header .section-title { margin-bottom: 0; }
+    .btn-ghost { padding: 4px 10px; border-radius: var(--radius); font-size: 12px; font-weight: 500; border: 1px solid var(--border); color: var(--accent); background: transparent; transition: all .15s; }
+    .btn-ghost:hover { background: #4a7c5918; }
+
+    /* ── Empty state with CTA ── */
+    .empty-state { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 20px; color: var(--muted); text-align: center; }
+    .empty-state-icon { font-size: 32px; }
+    .empty-state-title { font-size: 15px; font-weight: 600; color: var(--text); }
+    .empty-state-sub { font-size: 13px; }
+
+    /* ── Delete confirm ── */
+    .btn-danger { background: var(--red); color: white; }
+    .btn-danger:hover { background: #a93226; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+// ─────────────────────────────────────────────
+// MOCK DATA
+// ─────────────────────────────────────────────
+
+const RAW_ACCOUNTS = [
+  {
+    id: "acct_001",
+    name: "Stripe",
+    industry: "Fintech / Payments",
+    size: "4,000+ employees",
+    website: "stripe.com",
+    signals: [
+      { id: "s1a", type: "leadership_hire", relevance: "high",
+        title: "New VP of Platform Engineering hired",
+        detail: "Jane Whitmore joined from AWS API Gateway team — public post cited 'modernizing internal developer platform' as top priority.",
+        source: "LinkedIn", date: "2026-06-18", weight: 25 },
+      { id: "s1b", type: "job_postings", relevance: "high",
+        title: "14 open API infrastructure roles",
+        detail: "Roles span API gateway, service mesh, and developer portal — signal of active platform build-out.",
+        source: "Stripe Careers", date: "2026-06-22", weight: 18 },
+      { id: "s1c", type: "pain_signal", relevance: "medium",
+        title: "Engineering blog: 'We outgrew our homegrown API layer'",
+        detail: "Post-mortem on a rate-limiting incident blamed on internal tooling limitations. Comments mention evaluating vendors.",
+        source: "Stripe Engineering Blog", date: "2026-05-30", weight: 12 },
+      { id: "s1d", type: "conference_mention", relevance: "low",
+        title: "Spoke at API World 2026",
+        detail: "Talk titled 'Developer Experience at Scale' — touched on gateway standardization challenges.",
+        source: "API World", date: "2026-04-10", weight: 6 },
+    ]
+  },
+  {
+    id: "acct_002",
+    name: "Notion",
+    industry: "Productivity SaaS",
+    size: "800–1,000 employees",
+    website: "notion.so",
+    signals: [
+      { id: "s2a", type: "funding_round", relevance: "high",
+        title: "Series C — $275M raised",
+        detail: "Earmarked for enterprise features and API ecosystem expansion per investor memo.",
+        source: "TechCrunch", date: "2026-06-05", weight: 20 },
+      { id: "s2b", type: "tech_stack_change", relevance: "high",
+        title: "Migrating to microservices architecture",
+        detail: "CTO talk at QCon confirmed monolith decomposition underway — 60+ planned internal services by Q4.",
+        source: "QCon Talk", date: "2026-05-14", weight: 18 },
+      { id: "s2c", type: "job_postings", relevance: "medium",
+        title: "6 open platform/API engineering roles",
+        detail: "Job descriptions explicitly mention 'API gateway' and 'rate limiting' tooling.",
+        source: "Notion Careers", date: "2026-06-20", weight: 14 },
+    ]
+  },
+  {
+    id: "acct_003",
+    name: "Rippling",
+    industry: "HR / Fintech",
+    size: "3,000–5,000 employees",
+    website: "rippling.com",
+    signals: [
+      { id: "s3a", type: "leadership_hire", relevance: "high",
+        title: "Chief Architect hired from Twilio",
+        detail: "Marcus Leal's LinkedIn announcement specifically called out API platform unification as a mandate.",
+        source: "LinkedIn", date: "2026-06-24", weight: 25 },
+      { id: "s3b", type: "pain_signal", relevance: "high",
+        title: "G2 reviews: 'API inconsistency across modules'",
+        detail: "Three enterprise reviews in the last 60 days flagged fragmented API behavior as a blocker for custom integrations.",
+        source: "G2", date: "2026-06-10", weight: 15 },
+      { id: "s3c", type: "partnership_announce", relevance: "medium",
+        title: "New Salesforce ISV partnership announced",
+        detail: "Integration requires standardized API contract across HR and Finance modules — creates architectural pressure.",
+        source: "Rippling Blog", date: "2026-05-22", weight: 10 },
+    ]
+  },
+  {
+    id: "acct_004",
+    name: "Vercel",
+    industry: "Developer Infrastructure",
+    size: "500–800 employees",
+    website: "vercel.com",
+    signals: [
+      { id: "s4a", type: "tech_stack_change", relevance: "high",
+        title: "Announced edge-native API runtime",
+        detail: "Product blog confirms move to distributed edge execution — existing API management patterns won't scale.",
+        source: "Vercel Blog", date: "2026-06-15", weight: 18 },
+      { id: "s4b", type: "job_postings", relevance: "medium",
+        title: "8 platform/security engineering roles",
+        detail: "Several roles mention 'API security', 'traffic management', and 'developer portal'.",
+        source: "Vercel Careers", date: "2026-06-19", weight: 14 },
+      { id: "s4c", type: "conference_mention", relevance: "medium",
+        title: "Keynote mention at Next.js Conf",
+        detail: "CEO referenced 'enterprise API controls' as a key gap being addressed in H2 roadmap.",
+        source: "Next.js Conf 2026", date: "2026-05-08", weight: 8 },
+    ]
+  },
+  {
+    id: "acct_005",
+    name: "Brex",
+    industry: "Fintech / Corporate Cards",
+    size: "1,000–2,000 employees",
+    website: "brex.com",
+    signals: [
+      { id: "s5a", type: "funding_round", relevance: "high",
+        title: "Series E — $300M at $12B valuation",
+        detail: "Funding announcement highlights global expansion — new international API compliance requirements expected.",
+        source: "Bloomberg", date: "2026-03-12", weight: 14 },
+      { id: "s5b", type: "tech_stack_change", relevance: "medium",
+        title: "Elixir → Go migration for core services",
+        detail: "Engineering blog documents stack shift with emphasis on building a 'unified API layer' for partners.",
+        source: "Brex Engineering", date: "2026-04-28", weight: 12 },
+    ]
+  },
+  {
+    id: "acct_006",
+    name: "Figma",
+    industry: "Design SaaS",
+    size: "1,000–2,000 employees",
+    website: "figma.com",
+    signals: [
+      { id: "s6a", type: "partnership_announce", relevance: "medium",
+        title: "Adobe integration partnership",
+        detail: "Deep API integration announced — requires new API governance layer per engineering FAQ.",
+        source: "Figma Blog", date: "2026-05-30", weight: 10 },
+      { id: "s6b", type: "job_postings", relevance: "low",
+        title: "3 API developer experience roles",
+        detail: "Focused on external developer portal — less of a gateway signal, more DX.",
+        source: "Figma Careers", date: "2026-06-10", weight: 8 },
+    ]
+  },
+];
+
+// ─────────────────────────────────────────────
+// SCORING UTILITY
+// ─────────────────────────────────────────────
+const TODAY = "2026-06-28";
+
+function daysSince(dateStr) {
+  const then = new Date(dateStr);
+  const now = new Date(TODAY);
+  return Math.floor((now - then) / (1000 * 60 * 60 * 24));
+}
+
+function decayFactor(dateStr) {
+  const d = daysSince(dateStr);
+  if (d <= 30)  return 1.0;
+  if (d <= 90)  return 0.7;
+  return 0.4;
+}
+
+function computeScore(signals) {
+  const breakdown = signals.map(sig => {
+    const decayed = Math.round(sig.weight * decayFactor(sig.date));
+    return { signalId: sig.id, label: sig.title, rawWeight: sig.weight, decayedWeight: decayed, date: sig.date };
+  });
+  return Math.min(100, breakdown.reduce((s, b) => s + b.decayedWeight, 0));
+}
+
+function computeAccount(raw) {
+  if (!raw.signals || raw.signals.length === 0) {
+    return { ...raw, score: 0, scoreBreakdown: [], topSignal: null, lastActivity: TODAY };
+  }
+  const breakdown = raw.signals.map(sig => {
+    const decayed = Math.round(sig.weight * decayFactor(sig.date));
+    return { signalId: sig.id, label: sig.title, rawWeight: sig.weight, decayedWeight: decayed, date: sig.date };
+  });
+  const total = Math.min(100, breakdown.reduce((s, b) => s + b.decayedWeight, 0));
+  const topSignal = raw.signals.reduce((best, s) =>
+    (s.weight * decayFactor(s.date)) > (best.weight * decayFactor(best.date)) ? s : best
+  );
+  const lastActivity = raw.signals.reduce((latest, s) =>
+    s.date > latest ? s.date : latest, "1970-01-01"
+  );
+  // Score 30 days ago (simulate by ignoring signals added in last 30d)
+  const oldSignals = raw.signals.map(sig => {
+    const d = daysSince(sig.date);
+    const fakeFactor = d <= 30 ? 0.7 : (d <= 90 ? 0.7 : 0.4);
+    return Math.round(sig.weight * fakeFactor);
+  });
+  const scoreOld = Math.min(100, oldSignals.reduce((a, b) => a + b, 0));
+  return { ...raw, score: total, scoreBreakdown: breakdown, topSignal, lastActivity, scoreOld };
+}
+
+const ACCOUNTS = RAW_ACCOUNTS.map(computeAccount);
+
+// ─────────────────────────────────────────────
+// SIGNAL METADATA
+// ─────────────────────────────────────────────
+const SIGNAL_META = {
+  leadership_hire:     { icon: "👤", label: "Leadership Hire" },
+  job_postings:        { icon: "📋", label: "Job Postings" },
+  funding_round:       { icon: "💰", label: "Funding Round" },
+  tech_stack_change:   { icon: "⚙️",  label: "Tech Stack Change" },
+  conference_mention:  { icon: "🎤", label: "Conference Mention" },
+  pain_signal:         { icon: "⚠️",  label: "Pain Signal" },
+  partnership_announce:{ icon: "🤝", label: "Partnership" },
+};
+
+const SIGNAL_TYPES = Object.entries(SIGNAL_META).map(([key, v]) => ({ key, ...v }));
+
+// ─────────────────────────────────────────────
+// OUTREACH DRAFTS
+// ─────────────────────────────────────────────
+function generateDraft(account) {
+  if (!account.topSignal) return `Hi [First Name],\n\nWanted to reach out about ${account.name}...\n\n[Draft your message here]`;
+  const sig = account.topSignal;
+  const name = account.name;
+  const drafts = {
+    leadership_hire: `Hi [First Name],\n\nCongrats on the new role — saw your announcement about joining ${name}. When execs come in with a platform modernization mandate, the API infrastructure question usually surfaces fast.\n\nWe work with a few companies in the ${account.industry.split('/')[0].trim()} space going through exactly that moment. Happy to share what patterns have worked — no pitch, just context if it's useful.\n\nWorth a 20-minute chat in the next few weeks?`,
+    job_postings: `Hi [First Name],\n\nNoticed ${name} has opened up a number of platform/API engineering roles — usually a reliable signal that something architectural is being re-thought or scaled.\n\nWe help teams like yours avoid rebuilding API management from scratch. Happy to share how similar companies have structured this.\n\nOpen to a quick conversation?`,
+    funding_round: `Hi [First Name],\n\nCongrats on the recent round — great validation of what the team is building. Post-close is often when platform investment decisions get prioritized and budgets actually move.\n\nIf API infrastructure is on the roadmap, we've helped teams in your space navigate that build vs. buy decision quickly.\n\nWorth 20 minutes?`,
+    tech_stack_change: `Hi [First Name],\n\nSaw that ${name} is moving toward a more distributed architecture — exciting shift, and one that usually surfaces new API management challenges pretty quickly.\n\nWe've helped several teams going through similar migrations avoid rebuilding that layer themselves.\n\nInterested in a quick call?`,
+    conference_mention: `Hi [First Name],\n\nCaught ${name}'s talk at [Conference] — the point about [topic] resonated. Teams doing interesting work at scale usually hit the API governance question eventually.\n\nWe work with companies in your space on exactly that. Worth a quick conversation?`,
+    pain_signal: `Hi [First Name],\n\nSaw some of the public feedback around ${name}'s API layer — the consistency challenges you're describing are ones we see often at this stage of growth, and they compound fast.\n\nWe help teams get ahead of that before it becomes a roadblock.\n\nOpen to 20 minutes?`,
+    partnership_announce: `Hi [First Name],\n\nCongrats on the [Partner] partnership announcement — big deal. Integrations like that usually put pressure on API consistency across teams and modules.\n\nWe've helped companies in similar moments standardize their API layer before it became a bottleneck.\n\nWorth a quick chat?`,
+  };
+  return drafts[sig.type] || `Hi [First Name],\n\nWanted to reach out about ${name}...\n\n[Draft your message here]`;
+}
+
+// ─────────────────────────────────────────────
+// SHARED COMPONENTS
+// ─────────────────────────────────────────────
+function ScoreBadge({ score }) {
+  const tier = score >= 70 ? "hot" : score >= 45 ? "warm" : "cold";
+  return <div className={`score-badge ${tier}`}>{score}</div>;
+}
+
+function SignalPill({ relevance, label }) {
+  return (
+    <span className={`signal-pill ${relevance}`}>
+      <span className="signal-dot" />
+      {label}
+    </span>
+  );
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// ─────────────────────────────────────────────
+// ACCOUNT LIST
+// ─────────────────────────────────────────────
+function AccountList({ accounts, onSelect, selectedId, onAddClick }) {
+  const [sortKey, setSortKey] = React.useState("score");
+  const [search, setSearch] = React.useState("");
+  const [filterType, setFilterType] = React.useState(null);
+
+  const sorted = [...accounts]
+    .filter(a => {
+      const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
+                          a.industry.toLowerCase().includes(search.toLowerCase());
+      const matchFilter = !filterType || a.signals.some(s => s.type === filterType);
+      return matchSearch && matchFilter;
+    })
+    .sort((a, b) => {
+      if (sortKey === "score") return b.score - a.score;
+      if (sortKey === "recent") return b.lastActivity.localeCompare(a.lastActivity);
+      if (sortKey === "name")   return a.name.localeCompare(b.name);
+      return 0;
+    });
+
+  return (
+    <div className="list-pane">
+      <div className="list-header">
+        <h1>Accounts</h1>
+        <span className="list-count">{sorted.length} of {accounts.length}</span>
+        <div style={{ flex: 1 }} />
+        <input style={{ width: 200 }} placeholder="Search accounts…" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className="btn btn-primary" style={{ whiteSpace: "nowrap" }} onClick={onAddClick}>+ Add Account</button>
+      </div>
+
+      <div className="sort-bar">
+        <span>Sort:</span>
+        {[["score","Top Score"], ["recent","Most Recent"], ["name","Name A–Z"]].map(([key, label]) => (
+          <button key={key} className={`sort-btn ${sortKey === key ? "active" : ""}`} onClick={() => setSortKey(key)}>{label}</button>
+        ))}
+      </div>
+
+      <div className="filter-bar">
+        <span>Filter:</span>
+        <button className={`filter-btn ${!filterType ? "active" : ""}`} onClick={() => setFilterType(null)}>All</button>
+        {SIGNAL_TYPES.map(t => (
+          <button key={t.key} className={`filter-btn ${filterType === t.key ? "active" : ""}`} onClick={() => setFilterType(filterType === t.key ? null : t.key)}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="empty">No accounts match your search or filter.</div>
+      ) : (
+        <table className="account-table">
+          <thead>
+            <tr>
+              <th>Score</th>
+              <th>Account</th>
+              <th>Top Signal</th>
+              <th>Last Activity</th>
+              <th>Signals</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(acct => (
+              <tr key={acct.id} onClick={() => onSelect(acct)} className={selectedId === acct.id ? "selected" : ""}>
+                <td><ScoreBadge score={acct.score} /></td>
+                <td>
+                  <div className="acct-name">{acct.name}</div>
+                  <div className="acct-industry">{acct.industry} · {acct.size}</div>
+                </td>
+                <td>
+                  {acct.topSignal
+                    ? <SignalPill relevance={acct.topSignal.relevance} label={SIGNAL_META[acct.topSignal.type]?.label || acct.topSignal.type} />
+                    : <span style={{ color: "var(--muted)", fontSize: 12 }}>No signals yet</span>
+                  }
+                </td>
+                <td><span className="date-text">{acct.lastActivity !== TODAY ? formatDate(acct.lastActivity) : "—"}</span></td>
+                <td><span style={{ color: "var(--muted)", fontSize: 13 }}>{acct.signals.length}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ADD SIGNAL MODAL
+// ─────────────────────────────────────────────
+function AddSignalModal({ onClose, onAdd }) {
+  const [form, setForm] = React.useState({ type: "leadership_hire", relevance: "high", title: "", detail: "", source: "", date: TODAY, weight: 15 });
+  function set(k, v) { setForm(prev => ({ ...prev, [k]: v })); }
+
+  function submit(e) {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    onAdd({ ...form, id: "sig_" + Date.now(), weight: Number(form.weight) });
+    onClose();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2>Add Signal</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="modal-body">
+            <div className="field-row">
+              <div className="field">
+                <label>Signal Type</label>
+                <select value={form.type} onChange={e => set("type", e.target.value)}>
+                  {SIGNAL_TYPES.map(t => <option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Relevance</label>
+                <select value={form.relevance} onChange={e => set("relevance", e.target.value)}>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+            <div className="field">
+              <label>Title *</label>
+              <input placeholder="e.g. New VP of Engineering hired" value={form.title} onChange={e => set("title", e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Detail</label>
+              <textarea style={{ minHeight: 70, resize: "vertical" }} placeholder="Additional context…" value={form.detail} onChange={e => set("detail", e.target.value)} />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Source</label>
+                <input placeholder="e.g. LinkedIn" value={form.source} onChange={e => set("source", e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Date</label>
+                <input type="date" value={form.date} onChange={e => set("date", e.target.value)} />
+              </div>
+            </div>
+            <div className="field">
+              <label>Weight (1–30)</label>
+              <input type="number" min="1" max="30" value={form.weight} onChange={e => set("weight", e.target.value)} />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Add Signal</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// OUTREACH PANEL
+// ─────────────────────────────────────────────
+function OutreachPanel({ account }) {
+  const [draft, setDraft] = React.useState(() => generateDraft(account));
+  const [sent, setSent] = React.useState(false);
+
+  React.useEffect(() => { setDraft(generateDraft(account)); setSent(false); }, [account.id]);
+
+  if (!account.topSignal) {
+    return (
+      <div className="outreach-section">
+        <div className="section-title">Outreach Draft</div>
+        <div style={{ color: "var(--muted)", fontSize: 13 }}>Add at least one signal to generate an outreach draft.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="outreach-section">
+      <div className="section-title">Outreach Draft</div>
+      <div className="outreach-angle">Angle: <strong>{SIGNAL_META[account.topSignal.type]?.label}</strong> — "{account.topSignal.title}"</div>
+      <textarea className="draft-textarea" value={draft} onChange={e => setDraft(e.target.value)} />
+      <div className="outreach-actions">
+        <button className="btn btn-primary" onClick={() => setSent(true)}>✓ Mock Send</button>
+        <button className="btn btn-secondary" onClick={() => { setDraft(generateDraft(account)); setSent(false); }}>↺ Reset Draft</button>
+      </div>
+      {sent && <div className="send-toast">✓ Message logged (mock send — no email sent)</div>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ACCOUNT DETAIL
+// ─────────────────────────────────────────────
+function AccountDetail({ account: initialAccount, onClose, onUpdate, onDelete }) {
+  const [account, setAccount] = React.useState(initialAccount);
+  const [showAddSignal, setShowAddSignal] = React.useState(false);
+  const [notes, setNotes] = React.useState(initialAccount.notes || "");
+  const [notesSaved, setNotesSaved] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
+  // Escape key to close
+  React.useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Sync if parent updates
+  React.useEffect(() => { setAccount(initialAccount); setNotes(initialAccount.notes || ""); }, [initialAccount.id]);
+
+  function handleAddSignal(sig) {
+    const updated = computeAccount({ ...account, signals: [...account.signals, sig] });
+    setAccount(updated);
+    onUpdate(updated);
+  }
+
+  function saveNotes() {
+    const updated = { ...account, notes };
+    setAccount(updated);
+    onUpdate(updated);
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  }
+
+  const maxDecayed = account.scoreBreakdown.length ? Math.max(...account.scoreBreakdown.map(b => b.decayedWeight)) : 1;
+  const delta = account.score - (account.scoreOld || 0);
+
+  return (
+    <div className="detail-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="detail-pane">
+        <div className="detail-header">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <ScoreBadge score={account.score} />
+            <span style={{ fontSize: 10, color: "var(--muted)" }}>score</span>
+          </div>
+          <div className="detail-header-info">
+            <h2>{account.name}</h2>
+            <div className="detail-meta">
+              <span>{account.industry}</span>
+              <span>·</span>
+              <span>{account.size}</span>
+              {account.website && <><span>·</span><a href={`https://${account.website}`} target="_blank" rel="noreferrer">{account.website}</a></>}
+            </div>
+          </div>
+          <button className="close-btn" onClick={onClose} title="Close (Esc)">×</button>
+        </div>
+
+        <div className="detail-body">
+
+          {/* Score Breakdown + delta */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div className="section-title" style={{ margin: 0 }}>Why this score?</div>
+              {delta !== 0 && (
+                <span className={`score-delta ${delta > 0 ? "up" : "down"}`}>
+                  {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} vs 30d ago
+                </span>
+              )}
+              {delta === 0 && <span className="score-delta flat">→ flat vs 30d ago</span>}
+            </div>
+            {account.scoreBreakdown.length === 0 ? (
+              <div style={{ color: "var(--muted)", fontSize: 13 }}>No signals yet — add one below.</div>
+            ) : account.scoreBreakdown.map(b => (
+              <div className="score-row" key={b.signalId}>
+                <div className="score-label">{b.label}</div>
+                <div className="score-bar-wrap">
+                  <div className="score-bar-fill" style={{ width: `${(b.decayedWeight / maxDecayed) * 100}%` }} />
+                </div>
+                <div className="score-pts">+{b.decayedWeight}</div>
+              </div>
+            ))}
+            {account.scoreBreakdown.length > 0 && (
+              <div className="score-total-row">
+                <span>Total score</span>
+                <span style={{ color: account.score >= 70 ? "var(--green)" : account.score >= 45 ? "var(--yellow)" : "var(--muted)" }}>
+                  {account.score} / 100
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Signal Timeline */}
+          <div>
+            <div className="section-header">
+              <div className="section-title">Signals ({account.signals.length})</div>
+              <button className="btn-ghost" onClick={() => setShowAddSignal(true)}>+ Add Signal</button>
+            </div>
+            {account.signals.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">📭</div>
+                <div className="empty-state-title">No signals yet</div>
+                <div className="empty-state-sub">Log a signal to start scoring this account and generate an outreach draft.</div>
+                <button className="btn btn-primary" onClick={() => setShowAddSignal(true)}>+ Add First Signal</button>
+              </div>
+            ) : (
+              <div className="signal-list">
+                {[...account.signals].sort((a, b) => b.date.localeCompare(a.date)).map(sig => {
+                  const isTop = account.topSignal && sig.id === account.topSignal.id;
+                  const decay = decayFactor(sig.date);
+                  return (
+                    <div className={`signal-card ${isTop ? "top" : ""}`} key={sig.id}>
+                      <div className="signal-icon">{SIGNAL_META[sig.type]?.icon || "📌"}</div>
+                      <div className="signal-content">
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                          <div className="signal-title">{sig.title}</div>
+                          {isTop && <span className="top-tag">Top Signal</span>}
+                        </div>
+                        <div className="signal-detail">{sig.detail}</div>
+                        <div className="signal-footer">
+                          <span className="signal-source">{sig.source}</span>
+                          <span className="signal-date">{formatDate(sig.date)}</span>
+                          {decay < 1 && (
+                            <span style={{ fontSize: 11, color: "var(--yellow)" }}>{decay < 0.5 ? "⚠ stale" : "↓ decayed"}</span>
+                          )}
+                          <span className="signal-weight">+{Math.round(sig.weight * decay)} pts</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div className="notes-section">
+            <div className="section-header" style={{ marginBottom: 10 }}>
+              <div className="section-title" style={{ margin: 0 }}>Notes</div>
+              {notesSaved && <span className="notes-saved">✓ Saved</span>}
+            </div>
+            <textarea
+              className="notes-textarea"
+              placeholder="Jot context that doesn't fit a signal — e.g. spoke to their CTO at a conference, waiting on procurement review…"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+            />
+            <button className="btn btn-secondary" onClick={saveNotes}>Save Notes</button>
+          </div>
+
+          {/* Outreach */}
+          <OutreachPanel account={account} />
+
+          {/* Delete account */}
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+            {!confirmDelete ? (
+              <button className="btn btn-secondary" style={{ fontSize: 12, color: "var(--red)", borderColor: "var(--red)" }} onClick={() => setConfirmDelete(true)}>
+                Delete Account
+              </button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>Are you sure?</span>
+                <button className="btn btn-danger" onClick={() => { onDelete(account.id); onClose(); }}>Yes, Delete</button>
+                <button className="btn btn-secondary" onClick={() => setConfirmDelete(false)}>Cancel</button>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+      {showAddSignal && <AddSignalModal onClose={() => setShowAddSignal(false)} onAdd={handleAddSignal} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// CONNECTORS DATA
+// ─────────────────────────────────────────────
+const CONNECTORS_DATA = [
+  { id: "linkedin", icon: "💼", name: "LinkedIn Sales Navigator", category: "Prospecting", desc: "Pull leadership hires, job postings, and company updates directly into account signals.", defaultConnected: true, lastSync: "2026-06-28" },
+  { id: "salesforce", icon: "☁️", name: "Salesforce CRM", category: "CRM", desc: "Sync accounts, contacts, and opportunity data. Push outreach drafts as tasks or activities.", defaultConnected: true, lastSync: "2026-06-28" },
+  { id: "hubspot", icon: "🟠", name: "HubSpot", category: "CRM", desc: "Bi-directional sync with HubSpot contacts and deals. Auto-enroll accounts into sequences.", defaultConnected: false, lastSync: null },
+  { id: "apollo", icon: "🚀", name: "Apollo.io", category: "Prospecting", desc: "Enrich accounts with verified contact data and buying intent signals from Apollo.", defaultConnected: false, lastSync: null },
+  { id: "g2", icon: "⭐", name: "G2 Intent", category: "Intent Data", desc: "Surface accounts actively researching your category on G2 as high-priority signals.", defaultConnected: true, lastSync: "2026-06-27" },
+  { id: "slack", icon: "💬", name: "Slack", category: "Notifications", desc: "Get alerts in Slack when a high-score account shows new activity or a draft is ready.", defaultConnected: false, lastSync: null },
+  { id: "outreach", icon: "📨", name: "Outreach.io", category: "Sequencing", desc: "Send outreach drafts directly into Outreach sequences with one click.", defaultConnected: false, lastSync: null },
+  { id: "news", icon: "📰", name: "NewsAPI / Web Signals", category: "Intent Data", desc: "Monitor press releases, funding announcements, and tech news for account triggers.", defaultConnected: true, lastSync: "2026-06-28" },
+];
+
+// ─────────────────────────────────────────────
+// CONNECTORS PAGE
+// ─────────────────────────────────────────────
+function ConnectorsPage() {
+  const [connectors, setConnectors] = React.useState(() =>
+    CONNECTORS_DATA.map(c => ({ ...c, connected: c.defaultConnected }))
+  );
+
+  function toggle(id) {
+    setConnectors(prev => prev.map(c => c.id === id
+      ? { ...c, connected: !c.connected, lastSync: !c.connected ? TODAY : null }
+      : c
+    ));
+  }
+
+  const activeCount = connectors.filter(c => c.connected).length;
+
+  return (
+    <div className="connectors-pane">
+      <h1>Connectors</h1>
+      <p className="connectors-desc">Connect your tools to automatically pull signals and push outreach into your existing workflow. {activeCount} of {connectors.length} active.</p>
+      <div className="connector-grid">
+        {connectors.map(c => (
+          <div key={c.id} className={`connector-card ${c.connected ? "connected" : ""}`}>
+            <div className="connector-top">
+              <div className="connector-icon">{c.icon}</div>
+              <div>
+                <div className="connector-name">{c.name}</div>
+                <div className="connector-category">{c.category}</div>
+              </div>
+            </div>
+            <div className="connector-desc">{c.desc}</div>
+            <div className="connector-status">
+              <div>
+                <span className={`status-pill ${c.connected ? "connected" : "disconnected"}`}>
+                  <span className="status-dot" />
+                  {c.connected ? "Connected" : "Not connected"}
+                </span>
+                {c.connected && c.lastSync && (
+                  <div className="connector-last-sync" style={{ marginTop: 4 }}>Last sync: {c.lastSync}</div>
+                )}
+              </div>
+              {c.connected
+                ? <button className="btn-disconnect" onClick={() => toggle(c.id)}>Disconnect</button>
+                : <button className="btn-connect" onClick={() => toggle(c.id)}>Connect</button>
+              }
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ADD ACCOUNT MODAL
+// ─────────────────────────────────────────────
+function AddAccountModal({ onClose, onAdd }) {
+  const [form, setForm] = React.useState({ name: "", industry: "", size: "", website: "" });
+  function set(field, val) { setForm(prev => ({ ...prev, [field]: val })); }
+
+  // Escape to close
+  React.useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function submit(e) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    onAdd(computeAccount({ id: "acct_" + Date.now(), name: form.name.trim(), industry: form.industry || "Other", size: form.size || "Unknown", website: form.website.trim(), signals: [] }));
+    onClose();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2>Add Account</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="modal-body">
+            <div className="field">
+              <label>Company Name *</label>
+              <input autoFocus placeholder="e.g. Acme Corp" value={form.name} onChange={e => set("name", e.target.value)} />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Industry</label>
+                <select value={form.industry} onChange={e => set("industry", e.target.value)}>
+                  <option value="">Select industry…</option>
+                  <option>Fintech / Payments</option>
+                  <option>Developer Infrastructure</option>
+                  <option>Productivity SaaS</option>
+                  <option>HR / Fintech</option>
+                  <option>Design SaaS</option>
+                  <option>E-Commerce</option>
+                  <option>Healthcare</option>
+                  <option>Security</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Company Size</label>
+                <select value={form.size} onChange={e => set("size", e.target.value)}>
+                  <option value="">Select size…</option>
+                  <option>1–50 employees</option>
+                  <option>50–200 employees</option>
+                  <option>200–500 employees</option>
+                  <option>500–1,000 employees</option>
+                  <option>1,000–5,000 employees</option>
+                  <option>5,000+ employees</option>
+                </select>
+              </div>
+            </div>
+            <div className="field">
+              <label>Website</label>
+              <input placeholder="e.g. acme.com" value={form.website} onChange={e => set("website", e.target.value)} />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Add Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// APP SHELL
+// ─────────────────────────────────────────────
+function App() {
+  const [selected, setSelected] = React.useState(null);
+  const [tab, setTab] = React.useState("accounts");
+  const [accounts, setAccounts] = React.useState(ACCOUNTS);
+  const [showAddModal, setShowAddModal] = React.useState(false);
+  const [connectorCount] = React.useState(CONNECTORS_DATA.filter(c => c.defaultConnected).length);
+
+  function addAccount(acct) { setAccounts(prev => [...prev, acct]); }
+
+  function updateAccount(updated) {
+    setAccounts(prev => prev.map(a => a.id === updated.id ? updated : a));
+    if (selected?.id === updated.id) setSelected(updated);
+  }
+
+  function deleteAccount(id) {
+    setAccounts(prev => prev.filter(a => a.id !== id));
+    if (selected?.id === id) setSelected(null);
+  }
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <div className="topbar-logo"><span>Nexus</span></div>
+        <div className="topbar-sub">SDR Intelligence</div>
+        <div className="topbar-spacer" />
+        <div className="topbar-badge">{accounts.length} accounts · mock data</div>
+      </div>
+      <div className="nav-tabs">
+        <button className={`nav-tab ${tab === "accounts" ? "active" : ""}`} onClick={() => setTab("accounts")}>Accounts</button>
+        <button className={`nav-tab ${tab === "connectors" ? "active" : ""}`} onClick={() => setTab("connectors")}>
+          Connectors · <span style={{ color: "var(--green)" }}>{connectorCount} active</span>
+        </button>
+      </div>
+      <div className="main">
+        {tab === "accounts" && (
+          <AccountList accounts={accounts} onSelect={setSelected} selectedId={selected?.id} onAddClick={() => setShowAddModal(true)} />
+        )}
+        {tab === "connectors" && <ConnectorsPage />}
+      </div>
+      {selected && (
+        <AccountDetail
+          account={selected}
+          onClose={() => setSelected(null)}
+          onUpdate={updateAccount}
+          onDelete={deleteAccount}
+        />
+      )}
+      {showAddModal && <AddAccountModal onClose={() => setShowAddModal(false)} onAdd={addAccount} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
